@@ -14,7 +14,7 @@
 
     public class CreateEdit
     {
-        public class Query : IAsyncRequest<Command>
+        public class Query : IRequest<Command>
         {
             public int? Id { get; set; }
         }
@@ -28,7 +28,7 @@
         }
 
 
-        public class Command : IAsyncRequest
+        public class Command : IRequest<int>
         {
             public Command()
             {
@@ -49,8 +49,10 @@
             [Display(Name = "Location")]
             public string OfficeAssignmentLocation { get; set; }
 
+            [IgnoreMap]
             public string[] SelectedCourses { get; set; }
 
+            [IgnoreMap]
             public List<AssignedCourseData> AssignedCourses { get; set; }
             public List<CourseInstructor> CourseInstructors { get; set; }
 
@@ -96,7 +98,7 @@
                 else
                 {
                     model = await _db.Instructors
-                        .Where(i => i.ID == message.Id)
+                        .Where(i => i.Id == message.Id)
                         .ProjectToSingleOrDefaultAsync<Command>();
                 }
 
@@ -111,16 +113,16 @@
                 var instructorCourses = new HashSet<int>(model.CourseInstructors.Select(c => c.CourseID));
                 var viewModel = allCourses.Select(course => new Command.AssignedCourseData
                 {
-                    CourseID = course.CourseID,
+                    CourseID = course.Id,
                     Title = course.Title,
-                    Assigned = instructorCourses.Contains(course.CourseID)
+                    Assigned = instructorCourses.Contains(course.Id)
                 }).ToList();
                 model.AssignedCourses = viewModel;
             }
 
         }
 
-        public class CommandHandler : AsyncRequestHandler<Command>
+        public class CommandHandler : IAsyncRequestHandler<Command, int>
         {
             private readonly SchoolContext _db;
 
@@ -129,7 +131,7 @@
                 _db = db;
             }
 
-            protected override async Task HandleCore(Command message)
+            public async Task<int> Handle(Command message)
             {
                 Instructor instructor;
                 if (message.Id == null)
@@ -142,64 +144,18 @@
                     instructor = await _db.Instructors
                         .Include(i => i.OfficeAssignment)
                         .Include(i => i.CourseInstructors)
-                        .Where(i => i.ID == message.Id)
+                        .Where(i => i.Id == message.Id)
                         .SingleAsync();
                 }
-                instructor.FirstMidName = message.FirstMidName;
-                instructor.LastName = message.LastName;
-                instructor.HireDate = message.HireDate.GetValueOrDefault();
 
-                if (string.IsNullOrWhiteSpace(message.OfficeAssignmentLocation))
-                {
-                    instructor.OfficeAssignment = null;
-                }
-                else if (instructor.OfficeAssignment == null)
-                {
-                    instructor.OfficeAssignment = new OfficeAssignment
-                    {
-                        Location = message.OfficeAssignmentLocation
-                    };
-                }
-                else
-                {
-                    instructor.OfficeAssignment.Location = message.OfficeAssignmentLocation;
-                }
+                var courses = await _db.Courses.ToListAsync();
 
-                UpdateInstructorCourses(message.SelectedCourses, instructor);
+                instructor.Handle(message, courses);
 
+                await _db.SaveChangesAsync();
+
+                return instructor.Id;
             }
-
-            private void UpdateInstructorCourses(string[] selectedCourses, Instructor instructorToUpdate)
-            {
-                if (selectedCourses == null)
-                {
-                    instructorToUpdate.CourseInstructors = new List<CourseInstructor>();
-                    return;
-                }
-
-                var selectedCoursesHS = new HashSet<string>(selectedCourses);
-                var instructorCourses = new HashSet<int>
-                    (instructorToUpdate.CourseInstructors.Select(c => c.CourseID));
-                foreach (var course in _db.Courses)
-                {
-                    if (selectedCoursesHS.Contains(course.CourseID.ToString()))
-                    {
-                        if (!instructorCourses.Contains(course.CourseID))
-                        {
-                            instructorToUpdate.CourseInstructors.Add(new CourseInstructor { Course = course, Instructor = instructorToUpdate});
-                        }
-                    }
-                    else
-                    {
-                        if (instructorCourses.Contains(course.CourseID))
-                        {
-                            var toRemove = instructorToUpdate.CourseInstructors.Where(ci => ci.CourseID == course.CourseID).Single();
-                            instructorToUpdate.CourseInstructors.Remove(toRemove);
-                        }
-                    }
-                }
-            }
-
         }
     }
 }

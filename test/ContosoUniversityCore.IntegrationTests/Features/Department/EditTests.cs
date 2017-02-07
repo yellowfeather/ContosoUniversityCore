@@ -1,6 +1,8 @@
 ﻿namespace ContosoUniversityCore.IntegrationTests.Features.Department
 {
     using System;
+    using System.Data.Entity;
+    using System.Linq;
     using System.Threading.Tasks;
     using ContosoUniversityCore.Features.Department;
     using Domain;
@@ -10,13 +12,13 @@
     {
         public async Task Should_get_edit_department_details(SliceFixture fixture)
         {
-            var admin = new Instructor
+            var adminId = await fixture.SendAsync(new ContosoUniversityCore.Features.Instructor.CreateEdit.Command
             {
                 FirstMidName = "George",
                 LastName = "Costanza",
                 HireDate = DateTime.Today,
-            };
-            await fixture.InsertAsync(admin);
+            });
+            var admin = await fixture.FindAsync<Instructor>(adminId);
 
             var dept = new Department
             {
@@ -29,31 +31,33 @@
 
             var query = new Edit.Query
             {
-                Id = dept.DepartmentID
+                Id = dept.Id
             };
 
             var result = await fixture.SendAsync(query);
 
             result.ShouldNotBeNull();
             result.Name.ShouldBe(dept.Name);
-            result.Administrator.ID.ShouldBe(admin.ID);
+            result.Administrator.Id.ShouldBe(admin.Id);
         }
 
         public async Task Should_edit_department(SliceFixture fixture)
         {
-            var admin = new Instructor
+            var adminId = await fixture.SendAsync(new ContosoUniversityCore.Features.Instructor.CreateEdit.Command
             {
                 FirstMidName = "George",
                 LastName = "Costanza",
                 HireDate = DateTime.Today,
-            };
-            var admin2 = new Instructor
+            });
+            var admin = await fixture.FindAsync<Instructor>(adminId);
+
+            var admin2Id = await fixture.SendAsync(new ContosoUniversityCore.Features.Instructor.CreateEdit.Command
             {
-                FirstMidName = "Jerry",
-                LastName = "Seinfeld",
+                FirstMidName = "George",
+                LastName = "Costanza",
                 HireDate = DateTime.Today,
-            };
-            await fixture.InsertAsync(admin, admin2);
+            });
+            var admin2 = await fixture.FindAsync<Instructor>(admin2Id);
 
             var dept = new Department
             {
@@ -66,7 +70,7 @@
 
             var command = new Edit.Command
             {
-                DepartmentID = dept.DepartmentID,
+                Id = dept.Id,
                 Name = "English",
                 Administrator = admin2,
                 StartDate = DateTime.Today.AddDays(-1),
@@ -75,15 +79,12 @@
 
             await fixture.SendAsync(command);
 
-            await fixture.ExecuteDbContextAsync(async db =>
-            {
-                var result = await db.Departments.FindAsync(dept.DepartmentID);
+            var result = await fixture.ExecuteDbContextAsync(db => db.Departments.Where(d => d.Id == dept.Id).Include(d => d.Administrator).SingleOrDefaultAsync());
 
-                result.Name.ShouldBe(command.Name);
-                result.Administrator.ID.ShouldBe(command.Administrator.ID);
-                result.StartDate.ShouldBe(command.StartDate.GetValueOrDefault());
-                result.Budget.ShouldBe(command.Budget.GetValueOrDefault());
-            });
+            result.Name.ShouldBe(command.Name);
+            result.Administrator.Id.ShouldBe(command.Administrator.Id);
+            result.StartDate.ShouldBe(command.StartDate.GetValueOrDefault());
+            result.Budget.ShouldBe(command.Budget.GetValueOrDefault());
         }
     }
 }

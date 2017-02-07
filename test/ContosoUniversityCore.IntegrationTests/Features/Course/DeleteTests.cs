@@ -12,14 +12,13 @@
     {
         public async Task Should_query_for_command(SliceFixture fixture)
         {
-            var admin = new Instructor
+            var adminId = await fixture.SendAsync(new ContosoUniversityCore.Features.Instructor.CreateEdit.Command
             {
                 FirstMidName = "George",
                 LastName = "Costanza",
                 HireDate = DateTime.Today,
-            };
-
-            await fixture.InsertAsync(admin);
+            });
+            var admin = await fixture.FindAsync<Instructor>(adminId);
 
             var dept = new Department
             {
@@ -29,19 +28,17 @@
                 StartDate = DateTime.Today
             };
 
-            await fixture.InsertAsync(dept);
-
             var course = new Course
             {
                 Credits = 4,
                 Department = dept,
-                CourseID = 1234,
+                Id = 1234,
                 Title = "English 101"
             };
 
-            await fixture.InsertAsync(course);
+            await fixture.InsertAsync(dept, course);
 
-            var result = await fixture.SendAsync(new Delete.Query {Id = course.CourseID});
+            var result = await fixture.SendAsync(new Delete.Query {Id = course.Id});
 
             result.ShouldNotBeNull();
             result.Credits.ShouldBe(course.Credits);
@@ -51,13 +48,13 @@
 
         public async Task Should_delete(SliceFixture fixture)
         {
-            var admin = new Instructor
+            var adminId = await fixture.SendAsync(new ContosoUniversityCore.Features.Instructor.CreateEdit.Command
             {
                 FirstMidName = "George",
                 LastName = "Costanza",
                 HireDate = DateTime.Today,
-            };
-            await fixture.InsertAsync(admin);
+            });
+            var admin = await fixture.FindAsync<Instructor>(adminId);
 
             var dept = new Department
             {
@@ -67,26 +64,21 @@
                 StartDate = DateTime.Today
             };
 
-            await fixture.InsertAsync(dept);
-
             var course = new Course
             {
                 Credits = 4,
                 Department = dept,
-                CourseID = 1234,
+                Id = 1234,
                 Title = "English 101"
             };
 
-            await fixture.InsertAsync(course);
+            await fixture.InsertAsync(dept, course);
 
-            await fixture.SendAsync(new Delete.Command {CourseID = course.CourseID});
+            await fixture.SendAsync(new Delete.Command {Id = course.Id});
 
-            await fixture.ExecuteDbContextAsync(async db =>
-            {
-                var result = await db.Courses.Where(c => c.CourseID == course.CourseID).SingleOrDefaultAsync();
+            var result = await fixture.ExecuteDbContextAsync(db => db.Courses.Where(c => c.Id == course.Id).SingleOrDefaultAsync());
 
-                result.ShouldBeNull();
-            });
+            result.ShouldBeNull();
         }
     }
 }

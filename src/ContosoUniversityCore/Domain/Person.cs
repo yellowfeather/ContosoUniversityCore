@@ -5,9 +5,9 @@ namespace ContosoUniversityCore.Domain
 {
     using DelegateDecompiler;
 
-    public abstract class Person
+    public abstract class Person : IEntity
     {
-        public int ID { get; set; }
+        public int Id { get; set; }
 
         [Required]
         [StringLength(50)]
@@ -21,12 +21,6 @@ namespace ContosoUniversityCore.Domain
 
         [Display(Name = "Full Name")]
         [Computed]
-        public string FullName
-        {
-            get
-            {
-                return LastName + ", " + FirstMidName;
-            }
-        }
+        public string FullName => LastName + ", " + FirstMidName;
     }
 }

@@ -10,14 +10,13 @@
     {
         public async Task Should_list_departments(SliceFixture fixture)
         {
-            var admin = new Instructor
+            var adminId = await fixture.SendAsync(new ContosoUniversityCore.Features.Instructor.CreateEdit.Command
             {
                 FirstMidName = "George",
                 LastName = "Costanza",
                 HireDate = DateTime.Today,
-            };
-
-            await fixture.InsertAsync<Person>(admin);
+            });
+            var admin = await fixture.FindAsync<Instructor>(adminId);
 
             var dept = new Department
             {

@@ -10,7 +10,7 @@
 
     public class Index
     {
-        public class Query : IAsyncRequest<Result>
+        public class Query : IRequest<Result>
         {
             public Department SelectedDepartment { get; set; }
         }
@@ -22,7 +22,7 @@
 
             public class Course
             {
-                public int CourseID { get; set; }
+                public int Id { get; set; }
                 public string Title { get; set; }
                 public int Credits { get; set; }
                 public string DepartmentName { get; set; }
@@ -40,11 +40,11 @@
 
             public async Task<Result> Handle(Query message)
             {
-                int? departmentID = message.SelectedDepartment?.DepartmentID;
+                int? departmentID = message.SelectedDepartment?.Id;
 
                 var courses = await _db.Courses
                     .Where(c => !departmentID.HasValue || c.DepartmentID == departmentID)
-                    .OrderBy(d => d.CourseID)
+                    .OrderBy(d => d.Id)
                     .ProjectToListAsync<Result.Course>();
 
                 return new Result

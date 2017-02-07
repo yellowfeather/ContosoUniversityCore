@@ -2,13 +2,16 @@
 {
     using System;
     using System.IO;
+    using System.Reflection;
     using System.Threading.Tasks;
+    using Domain;
     using FakeItEasy;
     using Infrastructure;
     using MediatR;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.DependencyModel;
     using Respawn;
 
     public class SliceFixture
@@ -23,6 +26,8 @@
 
             A.CallTo(() => host.ContentRootPath).Returns(Directory.GetCurrentDirectory());
 
+            FixEntryAssembly();
+
             var startup = new Startup(host);
             _configuration = startup.Configuration;
             var services = new ServiceCollection();
@@ -30,6 +35,20 @@
             var provider = services.BuildServiceProvider();
             _scopeFactory = provider.GetService<IServiceScopeFactory>();
             _checkpoint = new Checkpoint();
+        }
+
+        private static void FixEntryAssembly()
+        {
+            // http://dejanstojanovic.net/aspnet/2015/january/set-entry-assembly-in-unit-testing-methods/
+            AppDomainManager manager = new AppDomainManager();
+            FieldInfo entryAssemblyfield = manager.GetType()
+                .GetField("m_entryAssembly", BindingFlags.Instance | BindingFlags.NonPublic);
+            entryAssemblyfield?.SetValue(manager, typeof(Startup).Assembly);
+
+            AppDomain domain = AppDomain.CurrentDomain;
+            FieldInfo domainManagerField = domain.GetType()
+                .GetField("_domainManager", BindingFlags.Instance | BindingFlags.NonPublic);
+            domainManagerField?.SetValue(domain, manager);
         }
 
         public static void ResetCheckpoint()
@@ -59,56 +78,76 @@
             }
         }
 
+        public async Task<T> ExecuteScopeAsync<T>(Func<IServiceProvider, Task<T>> action)
+        {
+            using (var scope = _scopeFactory.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetService<SchoolContext>();
+
+                try
+                {
+                    dbContext.BeginTransaction();
+
+                    var result = await action(scope.ServiceProvider);
+
+                    await dbContext.CommitTransactionAsync();
+
+                    return result;
+                }
+                catch (Exception)
+                {
+                    dbContext.RollbackTransaction();
+                    throw;
+                }
+            }
+        }
+
         public Task ExecuteDbContextAsync(Func<SchoolContext, Task> action)
         {
             return ExecuteScopeAsync(sp => action(sp.GetService<SchoolContext>()));
         }
 
-        public Task InsertAsync<T>(params T[] entities)
-            where T : class
+        public Task<T> ExecuteDbContextAsync<T>(Func<SchoolContext, Task<T>> action)
         {
-            return ExecuteDbContextAsync(async ctx =>
+            return ExecuteScopeAsync(sp => action(sp.GetService<SchoolContext>()));
+        }
+
+        public Task InsertAsync(params IEntity[] entities)
+        {
+            return ExecuteDbContextAsync(db =>
             {
-                ctx.Set<T>().AddRange(entities);
-                await ctx.SaveChangesAsync();
+                foreach (var entity in entities)
+                {
+                    db.Set(entity.GetType()).Add(entity);
+                }
+                return db.SaveChangesAsync();
             });
         }
 
-        public async Task<T> FindAsync<T>(object id)
-            where T : class
+        public Task<T> FindAsync<T>(int id)
+            where T : class, IEntity
         {
-            T entity = null;
-            await ExecuteDbContextAsync(async ctx =>
-            {
-                entity = await ctx.Set<T>().FindAsync(id);
-            });
-            return entity;
+            return ExecuteDbContextAsync(db => db.Set<T>().FindAsync(id));
         }
 
-        public async Task<TResponse> SendAsync<TResponse>(IAsyncRequest<TResponse> request)
+        public Task<TResponse> SendAsync<TResponse>(IRequest<TResponse> request)
         {
-            var response = default(TResponse);
-            await ExecuteScopeAsync(async sp =>
+            return ExecuteScopeAsync(sp =>
             {
                 var mediator = sp.GetService<IMediator>();
 
-                response = await mediator.SendAsync(request);
+                return mediator.Send(request);
             });
-            return response;
         }
 
-        public async Task<TResponse> SendAsync<TResponse>(IRequest<TResponse> request)
+        public Task SendAsync(IRequest request)
         {
-            var response = default(TResponse);
-            await ExecuteScopeAsync(sp =>
+            return ExecuteScopeAsync(sp =>
             {
                 var mediator = sp.GetService<IMediator>();
 
-                response = mediator.Send(request);
-
-                return Task.FromResult(0);
+                return mediator.Send(request);
             });
-            return response;
         }
     }
 }

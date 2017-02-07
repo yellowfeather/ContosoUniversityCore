@@ -11,12 +11,12 @@
 
     public class Edit
     {
-        public class Query : IAsyncRequest<Command>
+        public class Query : IRequest<Command>
         {
             public int Id { get; set; }
         }
 
-        public class Command : IAsyncRequest
+        public class Command : IRequest
         {
             public string Name { get; set; }
 
@@ -25,7 +25,7 @@
             public DateTime? StartDate { get; set; }
 
             public Instructor Administrator { get; set; }
-            public int DepartmentID { get; set; }
+            public int Id { get; set; }
             public byte[] RowVersion { get; set; }
         }
 
@@ -52,14 +52,14 @@
             public async Task<Command> Handle(Query message)
             {
                 var department = await _db.Departments
-                    .Where(d => d.DepartmentID == message.Id)
+                    .Where(d => d.Id == message.Id)
                     .ProjectToSingleOrDefaultAsync<Command>();
 
                 return department;
             }
         }
 
-        public class CommandHandler : AsyncRequestHandler<Command>
+        public class CommandHandler : IAsyncRequestHandler<Command>
         {
             private readonly SchoolContext _db;
 
@@ -68,9 +68,10 @@
                 _db = db;
             }
 
-            protected override async Task HandleCore(Command message)
+            public async Task Handle(Command message)
             {
-                var dept = await _db.Departments.FindAsync(message.DepartmentID);
+                var dept = await _db.Departments.FindAsync(message.Id);
+                message.Administrator = await _db.Instructors.FindAsync(message.Administrator.Id);
 
                 Mapper.Map(message, dept);
             }

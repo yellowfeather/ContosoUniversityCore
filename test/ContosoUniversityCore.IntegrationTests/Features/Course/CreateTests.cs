@@ -12,14 +12,13 @@
     {
         public async Task Should_create_new_course(SliceFixture fixture)
         {
-            var admin = new Instructor
+            var adminId = await fixture.SendAsync(new ContosoUniversityCore.Features.Instructor.CreateEdit.Command
             {
                 FirstMidName = "George",
                 LastName = "Costanza",
                 HireDate = DateTime.Today,
-            };
-
-            await fixture.InsertAsync(admin);
+            });
+            var admin = await fixture.FindAsync<Instructor>(adminId);
 
             var dept = new Department
             {
@@ -40,15 +39,12 @@
             };
             await fixture.SendAsync(command);
 
-            await fixture.ExecuteDbContextAsync(async db =>
-            {
-                var created = await db.Courses.Where(c => c.CourseID == command.Number).SingleOrDefaultAsync();
+            var created = await fixture.ExecuteDbContextAsync(db => db.Courses.Where(c => c.Id == command.Number).SingleOrDefaultAsync());
 
-                created.ShouldNotBeNull();
-                created.DepartmentID.ShouldBe(dept.DepartmentID);
-                created.Credits.ShouldBe(command.Credits);
-                created.Title.ShouldBe(command.Title);
-            });
+            created.ShouldNotBeNull();
+            created.DepartmentID.ShouldBe(dept.Id);
+            created.Credits.ShouldBe(command.Credits);
+            created.Title.ShouldBe(command.Title);
         }
     }
 }

@@ -10,13 +10,13 @@
     {
         public async Task Should_return_all_courses(SliceFixture fixture)
         {
-            var admin = new Instructor
+            var adminId = await fixture.SendAsync(new ContosoUniversityCore.Features.Instructor.CreateEdit.Command
             {
                 FirstMidName = "George",
                 LastName = "Costanza",
                 HireDate = DateTime.Today,
-            };
-            await fixture.InsertAsync(admin);
+            });
+            var admin = await fixture.FindAsync<Instructor>(adminId);
 
             var englishDept = new Department
             {
@@ -32,23 +32,22 @@
                 Budget = 123m,
                 StartDate = DateTime.Today
             };
-            await fixture.InsertAsync(englishDept, historyDept);
 
             var english = new Course
             {
                 Credits = 4,
                 Department = englishDept,
-                CourseID = 1235,
+                Id = 1235,
                 Title = "English 101"
             };
             var history = new Course
             {
                 Credits = 4,
                 Department = historyDept,
-                CourseID = 4312,
+                Id = 4312,
                 Title = "History 101"
             };
-            await fixture.InsertAsync(english, history);
+            await fixture.InsertAsync(englishDept, historyDept, english, history);
 
             var result = await fixture.SendAsync(new Index.Query());
 
@@ -58,13 +57,13 @@
 
         public async Task Should_filter_courses(SliceFixture fixture)
         {
-            var admin = new Instructor
+            var adminId = await fixture.SendAsync(new ContosoUniversityCore.Features.Instructor.CreateEdit.Command
             {
                 FirstMidName = "George",
                 LastName = "Costanza",
                 HireDate = DateTime.Today,
-            };
-            await fixture.InsertAsync(admin);
+            });
+            var admin = await fixture.FindAsync<Instructor>(adminId);
 
             var englishDept = new Department
             {
@@ -80,29 +79,28 @@
                 Budget = 123m,
                 StartDate = DateTime.Today
             };
-            await fixture.InsertAsync(englishDept, historyDept);
 
             var english = new Course
             {
                 Credits = 4,
                 Department = englishDept,
-                CourseID = 1235,
+                Id = 1235,
                 Title = "English 101"
             };
             var history = new Course
             {
                 Credits = 4,
                 Department = historyDept,
-                CourseID = 4312,
+                Id = 4312,
                 Title = "History 101"
             };
-            await fixture.InsertAsync(english, history);
+            await fixture.InsertAsync(englishDept, historyDept, english, history);
 
             var result = await fixture.SendAsync(new Index.Query {SelectedDepartment = englishDept});
 
             result.ShouldNotBeNull();
             result.Courses.Count.ShouldBe(1);
-            result.Courses[0].CourseID.ShouldBe(english.CourseID);
+            result.Courses[0].Id.ShouldBe(english.Id);
         }
     }
 }

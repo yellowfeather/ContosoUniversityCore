@@ -1,15 +1,18 @@
-﻿using System.ComponentModel.DataAnnotations;
-
+﻿
 namespace ContosoUniversityCore.Domain
 {
+    using System.ComponentModel.DataAnnotations;
+    using System.ComponentModel.DataAnnotations.Schema;
+
     public enum Grade
     {
         A, B, C, D, F
     }
 
-    public class Enrollment
+    public class Enrollment : IEntity
     {
-        public int EnrollmentID { get; set; }
+        [Column("EnrollmentID")]
+        public int Id { get; set; }
         public int CourseID { get; set; }
         public int StudentID { get; set; }
         [DisplayFormat(NullDisplayText = "No grade")]

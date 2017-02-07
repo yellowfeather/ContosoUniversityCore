@@ -11,13 +11,13 @@
     {
         public async Task Should_delete_department(SliceFixture fixture)
         {
-            var admin = new Instructor
+            var adminId = await fixture.SendAsync(new ContosoUniversityCore.Features.Instructor.CreateEdit.Command
             {
                 FirstMidName = "George",
                 LastName = "Costanza",
                 HireDate = DateTime.Today,
-            };
-            await fixture.InsertAsync(admin);
+            });
+            var admin = await fixture.FindAsync<Instructor>(adminId);
 
             var dept = new Department
             {
@@ -30,18 +30,15 @@
 
             var command = new Delete.Command
             {
-                DepartmentID = dept.DepartmentID,
+                Id = dept.Id,
                 RowVersion = dept.RowVersion
             };
 
             await fixture.SendAsync(command);
 
-            await fixture.ExecuteDbContextAsync(async db =>
-            {
-                var any = await db.Departments.AnyAsync();
+            var any = await fixture.ExecuteDbContextAsync(db => db.Departments.AnyAsync());
 
-                any.ShouldBeFalse();
-            });
+            any.ShouldBeFalse();
         }
     }
 }

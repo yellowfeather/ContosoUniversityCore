@@ -9,7 +9,7 @@
 
     public class Details
     {
-        public class Query : IAsyncRequest<Model>
+        public class Query : IRequest<Model>
         {
             public int? Id { get; set; }
         }
@@ -24,7 +24,7 @@
 
         public class Model
         {
-            public int CourseID { get; set; }
+            public int Id { get; set; }
             public string Title { get; set; }
             public int Credits { get; set; }
             public string DepartmentName { get; set; }
@@ -39,9 +39,9 @@
                 _db = db;
             }
 
-            public async Task<Model> Handle(Query message)
+            public Task<Model> Handle(Query message)
             {
-                return await _db.Courses.Where(i => i.CourseID == message.Id).ProjectToSingleOrDefaultAsync<Model>();
+                return _db.Courses.Where(i => i.Id == message.Id).ProjectToSingleOrDefaultAsync<Model>();
             }
         }
     }
